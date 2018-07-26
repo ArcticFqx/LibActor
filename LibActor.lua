@@ -2,7 +2,7 @@
 -- LibActor global reference --
  -- -- -- -- -- -- -- -- -- --
 
-_G.libactor = {_VERSION = "LibActor 0.1"}
+_G.libactor = {_VERSION = "LibActor 0.1.1"}
 
 
 -- -- -- -- -- - - -- -- -- -- --
@@ -89,6 +89,7 @@ function libactor.Update(actor)
     local pack = actorCache[name] or includeLua(name, "UpdateCommand", actor)
     local ret = pack.Update(actor)
     if ret ~= false then
+        pack.UpdateRate = pack.UpdateRate or 60
         actor:sleep(1 / pack.UpdateRate)
         actor:queuecommand("Update")
     end
