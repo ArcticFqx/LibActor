@@ -2,7 +2,7 @@
 -- LibActor global reference --
  -- -- -- -- -- -- -- -- -- --
 
-_G.libactor = {_VERSION = "LibActor 0.2"}
+_G.libactor = {_VERSION = [[LibActor 0.2]]}
 
 
 -- -- -- -- -- - - -- -- -- -- --
@@ -29,10 +29,10 @@ function libactor.require(s, ...)
     local file =
         table.concat {
         string.sub(GAMESTATE:GetCurrentSong():GetSongDir(), 2),
-        string.gsub(name, "%.", "/"),
-        ".lua"
+        string.gsub(name, [[%.]], [[/]]),
+        [[.lua]]
     }
-    Trace("[LibActor] Loading " .. file)
+    Trace([[[LibActor] Loading ]] .. file)
     requireCache[name] = dofile(file)
     return requireCache[s]
 end
@@ -49,13 +49,13 @@ local function includeLua(name, intent, actor, typeOveride)
         actorCache[name] = ret
         return ret
     else
-        local type = typeOveride or string.match(tostring(actor), "^%w+")
+        local type = typeOveride or string.match(tostring(actor), [[^%w+]])
         local msg = table.concat {
-            "XML error: Failed to load Lua file\n\tfrom Actor/Condition '",
-            name, "' of type '", type, "' on attribute/callback '", intent,
-            "'\n\nYou should take a closer look at '",
+            [[XML error: Failed to load Lua file\n\tfrom Actor/Condition ']],
+            name, [[' of type ']], type, [[' on attribute/callback ']], intent,
+            [['\n\nYou should take a closer look at ']],
             string.sub(GAMESTATE:GetCurrentSong():GetSongDir(), 2),
-            "lua/", string.gsub(name, "%.", "/"), ".lua'\n\n",
+            [[lua/]], string.gsub(name, [[%.]], [[/]]), [[.lua'\n\n]],
             tostring(ret)
         }
         error(msg, 3)
@@ -76,11 +76,11 @@ libactor.GlobalData = {}
 -- Loads and runs InitCommand, will enable Update if defined
 function libactor.Init(actor)
     local name = actor:GetName()
-    local pack = includeLua(name, "InitCommand", actor)
+    local pack = includeLua(name, [[InitCommand]], actor)
     if pack.Update then
         pack.UpdateRate = pack.UpdateRate or 60
         actor:sleep(1 / pack.UpdateRate)
-        actor:queuecommand("Update")
+        actor:queuecommand([[Update]])
     end
     return pack.Init(actor)
 end
@@ -88,12 +88,12 @@ end
 -- Keeps it updating
 function libactor.Update(actor)
     local name = string.lower(actor:GetName())
-    local pack = actorCache[name] or includeLua(name, "UpdateCommand", actor)
+    local pack = actorCache[name] or includeLua(name, [[UpdateCommand]], actor)
     local ret = pack.Update(actor)
     if ret ~= false then
         pack.UpdateRate = pack.UpdateRate or 60
         actor:sleep(1 / pack.UpdateRate)
-        actor:queuecommand("Update")
+        actor:queuecommand([[Update]])
     end
     return ret
 end
@@ -109,7 +109,7 @@ end
 -- For Condition, name can be any available script, will run its Check function
 function libactor.Check(key)
     local name = string.lower(key)
-    local pack = actorCache[name] or includeLua(name, "Condition", nil, "Function")
+    local pack = actorCache[name] or includeLua(name, [[Condition]], nil, [[Function]])
     return pack.Check and pack.Check() or false
 end
 
@@ -126,22 +126,22 @@ function libactor:__index(key)
         return v
     end
     -- All access to OnSomething is assumed to come from XML
-    if string.find(key, "^On%u") then
+    if string.find(key, [[^On%u]]) then
         return function(actor)
             return libactor.ApplyCallback(actor, key)
         end
     end
     -- Will always return the latest sharedData
-    if key == "Data" then
+    if key == [[Data]] then
         return sharedData
     end
     -- Housekeeping
-    if key == "Refresh" then
+    if key == [[Refresh]] then
         requireCache = {}
         actorCache = {}
         messageCache = {}
         sharedData = {}
-        Trace "[LibActor] Cache and shared data cleanup complete"
+        Trace [[[LibActor] Cache and shared data cleanup complete]]
         return true
     end
     -- Else just return something from sharedData, shortcuts are nice
@@ -159,7 +159,7 @@ end
 -- And we are done!
 setmetatable(libactor, libactor)
 
-Trace "\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-Trace "[LibActor] initialized!"
-Trace("[LibActor] We are on version '" .. libactor._VERSION .. "'")
-Trace "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+Trace [[\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]]
+Trace [[[LibActor] initialized!]]
+Trace([[[LibActor] We are on version ']] .. libactor._VERSION .. [[']])
+Trace [[~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n]]
