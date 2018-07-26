@@ -2,27 +2,12 @@
 -- LibActor global reference --
  -- -- -- -- -- -- -- -- -- --
 
-_G.libactor = {_VERSION = "LibActor 0.1.1"}
+_G.libactor = {_VERSION = "LibActor 0.2"}
 
 
 -- -- -- -- -- - - -- -- -- -- --
 -- First lets add some utility --
 -- -- -- -- -- - - -- -- -- -- --
-
--- Redefine global require
--- As far as I know, this is the first ever script using it, so it *should* be safe
-local oldrequire = _G.require
-function _G.require(s, ...)
-    local file =
-        table.concat {
-        string.sub(GAMESTATE:GetCurrentSong():GetSongDir(), 2),
-        string.gsub(s, "%.", "/"),
-        ".lua"
-    }
-    _LOADED[file] = false
-    Trace("[LibActor] Loading " .. file)
-    return oldrequire(file)
-end
 
 -- Why not?
 _G.math.huge = 1 / 0
@@ -35,6 +20,23 @@ function _G.string.match(s, pattern, init)
     end
 end
 
+local requireCache = {}
+function libactor.require(s, ...)
+    local name = string.lower(s)
+    if requireCache[name] then
+        return requireCache[name]
+    end
+    local file =
+        table.concat {
+        string.sub(GAMESTATE:GetCurrentSong():GetSongDir(), 2),
+        string.gsub(name, "%.", "/"),
+        ".lua"
+    }
+    Trace("[LibActor] Loading " .. file)
+    requireCache[name] = dofile(file)
+    return requireCache[s]
+end
+
 -- Internal utility function
 local actorCache = {}
 local function includeLua(name, intent, actor, typeOveride)
@@ -42,7 +44,7 @@ local function includeLua(name, intent, actor, typeOveride)
     if actorCache[name] then
         return actorCache[name]
     end
-    local succ, ret = pcall(require, name)
+    local succ, ret = pcall(libactor.require, name)
     if succ then
         actorCache[name] = ret
         return ret
@@ -135,6 +137,7 @@ function libactor:__index(key)
     end
     -- Housekeeping
     if key == "Refresh" then
+        requireCache = {}
         actorCache = {}
         messageCache = {}
         sharedData = {}
