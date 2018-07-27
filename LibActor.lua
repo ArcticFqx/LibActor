@@ -2,7 +2,10 @@
 -- LibActor global reference --
  -- -- -- -- -- -- -- -- -- --
 
-_G.libactor = {_VERSION = [[LibActor 0.2]]}
+_G.libactor = {
+    _VERSION = [[LibActor 0.2.1]],
+    GlobalData = libactor and libactor.GlobalData or {}
+}
 
 
 -- -- -- -- -- - - -- -- -- -- --
@@ -69,9 +72,6 @@ end
 
 local messageCache = {}
 local sharedData = {}
-
--- Feel free to use me as you see fit
-libactor.GlobalData = {}
 
 -- Loads and runs InitCommand, will enable Update if defined
 function libactor.Init(actor)
