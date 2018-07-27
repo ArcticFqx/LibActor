@@ -3,7 +3,7 @@
  -- -- -- -- -- -- -- -- -- --
 
 _G.libactor = {
-    _VERSION = [[LibActor 0.2.1]],
+    _VERSION = [[LibActor 0.2.2-dev]],
     GlobalData = libactor and libactor.GlobalData or {}
 }
 
@@ -42,13 +42,15 @@ end
 
 -- Internal utility function
 local actorCache = {}
-local function includeLua(name, intent, actor, typeOveride)
-    name = string.lower(name)
+local function includeLua(key, intent, actor, typeOveride)
+    local name = string.lower(key)
     if actorCache[name] then
+        actorCache[key] = actorCache[name]
         return actorCache[name]
     end
     local succ, ret = pcall(libactor.require, name)
     if succ then
+        actorCache[key] = ret
         actorCache[name] = ret
         return ret
     else
@@ -87,7 +89,7 @@ end
 
 -- Keeps it updating
 function libactor.Update(actor)
-    local name = string.lower(actor:GetName())
+    local name = actor:GetName()
     local pack = actorCache[name] or includeLua(name, [[UpdateCommand]], actor)
     local ret = pack.Update(actor)
     if ret ~= false then
@@ -100,7 +102,7 @@ end
 
 -- Used for Messages and custom Commands
 function libactor.ApplyCallback(actor, key)
-    local name = string.lower(actor:GetName())
+    local name = actor:GetName()
     local pack = actorCache[name] or includeLua(name, key, actor)
     messageCache[key] = messageCache[key] or string.sub(key, 3)
     return pack[messageCache[key]](actor)
@@ -126,7 +128,7 @@ function libactor:__index(key)
         return v
     end
     -- All access to OnSomething is assumed to come from XML
-    if string.find(key, [[^On%u]]) then
+    if messageCache[key] or string.find(key, [[^On%u]]) then
         return function(actor)
             return libactor.ApplyCallback(actor, key)
         end
