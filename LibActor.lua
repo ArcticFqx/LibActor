@@ -110,8 +110,7 @@ end
 
 -- For Condition, name can be any available script, will run its Check function
 function libactor.Check(key)
-    local name = string.lower(key)
-    local pack = actorCache[name] or includeLua(name, [[Condition]], nil, [[Function]])
+    local pack = actorCache[key] or includeLua(key, [[Condition]], nil, [[Function]])
     return pack.Check and pack.Check() or false
 end
 
