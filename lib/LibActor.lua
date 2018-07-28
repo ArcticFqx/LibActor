@@ -182,9 +182,5 @@ end
 -- And we are done!
 setmetatable(libactor, libactor)
 
-Trace ' '
-Trace '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
-Trace '[LibActor] initialized!'
-Trace('[LibActor] We are on version \'' .. libactor._VERSION .. '\'')
-Trace '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
-Trace ' '
+Trace '[LibActor] Initialized!'
+Trace('[LibActor] We are on version "' .. libactor._VERSION .. '"')
