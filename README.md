@@ -9,7 +9,8 @@ A dev mode is available which should prevent your game from crashing if your scr
 
 # How to install
 ## Just for your chart
-Add `0.000=lib=1.000=0=0=0=====,` to your `#BGCHANGES` in your simfile.
+First, place the lib folder with the default.xml and libactor.lua files into your chart folder,  
+then add `0.000=lib=1.000=0=0=0=====,` to your `#BGCHANGES` in your simfile.  
 Modded `#BGCHANGES` must start at 0.001 or use `#BETTERBGCHANGES` instead.
 
 ## As a theme script
