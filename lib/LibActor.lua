@@ -3,7 +3,7 @@
  -- -- -- -- -- -- -- -- -- --
 
 _G.libactor = {
-    _VERSION = 'LibActor 0.4-dev1',
+    _VERSION = 'LibActor 0.4-dev2',
     GlobalData = libactor and libactor.GlobalData or {}
 }
 
@@ -16,7 +16,7 @@ local devmode = false
 libactor.Data = sharedData
 
 -- require with a search path only in your song directory
-function libactor.requireLua(s, ...)
+function libactor.Require(s, ...)
     local name = string.lower(s)
     if requireCache[name] then
         return unpack(requireCache[name])
@@ -39,7 +39,7 @@ local function includeLua(key)
         actorCache[key] = actorCache[name]
         return actorCache[name]
     end
-    actorCache[name] = libactor.requireLua(name)
+    actorCache[name] = libactor.Require(name)
     actorCache[key] = actorCache[name]
     return actorCache[name]
 end
@@ -143,7 +143,7 @@ local function devEnable()
     devApplyProtection('Update')
     devApplyProtection('ApplyCallback')
     devApplyProtection('Check')
-    devApplyProtection('require')
+    devApplyProtection('Require')
 
     Trace '[LibActor] DevMode enabled'
     return true
