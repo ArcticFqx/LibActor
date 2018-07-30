@@ -3,13 +3,20 @@
  -- -- -- -- -- -- -- -- -- --
 
 _G.libactor = {
-    _VERSION = 'LibActor 0.3',
+    _VERSION = 'LibActor 0.4-dev1',
     GlobalData = libactor and libactor.GlobalData or {}
 }
 
--- require with a search path only in your song directory
 local requireCache = {}
-local function requireLua(s, ...)
+local actorCache = {}
+local messageCache = {}
+local sharedData = {}
+local devmode = false
+
+libactor.Data = sharedData
+
+-- require with a search path only in your song directory
+function libactor.requireLua(s, ...)
     local name = string.lower(s)
     if requireCache[name] then
         return unpack(requireCache[name])
@@ -25,36 +32,34 @@ local function requireLua(s, ...)
     return unpack(requireCache[name])
 end
 
-libactor.require = requireLua
-
-local actorCache = {}
+-- Used internally for caching purposes
 local function includeLua(key)
     local name = string.lower(key)
     if actorCache[name] then
         actorCache[key] = actorCache[name]
         return actorCache[name]
     end
-    actorCache[name] = requireLua(name)
+    actorCache[name] = libactor.requireLua(name)
     actorCache[key] = actorCache[name]
     return actorCache[name]
 end
 
-local messageCache = {}
-local sharedData = {}
-
--- Loads and runs InitCommand, will enable Update if defined
+-- Convenience for InitCommand
+-- Will enable Update if defined and returned value is not false
 function libactor.Init(actor)
     local name = actor:GetName()
-    local pack = includeLua(name)
-    if pack.Update then
+    local pack = actorCache[name] or includeLua(name)
+    local ret = pack.Init(actor)
+    if ret ~= false and pack.Update then
         pack.UpdateRate = pack.UpdateRate or 60
         actor:sleep(1 / pack.UpdateRate)
         actor:queuecommand('Update')
     end
-    return pack.Init(actor)
+    return ret
 end
 
--- Keeps it updating
+-- Convenience for UpdateCommand
+-- Keeps it updating, return false to stop it
 function libactor.Update(actor)
     local name = actor:GetName()
     local pack = actorCache[name] or includeLua(name)
@@ -68,12 +73,28 @@ function libactor.Update(actor)
 end
 
 -- Used for Messages and custom Commands
-function libactor.ApplyCallback(actor, key)
-    local name = actor:GetName()
-    local pack = actorCache[name] or includeLua(name, key, actor)
+function libactor.ApplyCallback(actor, key, script)
+    local name = script or actor:GetName()
+    local pack = actorCache[name] or includeLua(name)
     messageCache[key] = messageCache[key] or string.sub(key, 3)
     return pack[messageCache[key]](actor)
 end
+
+-- For XML, redirection for actors to other files
+libactor.On = {}
+function libactor.On:__index(key)
+    local onto = {}
+    function onto:__index(script)
+        messageCache[key] = key
+        local ApplyCallback = libactor.ApplyCallback
+        return function(actor)
+            return ApplyCallback(actor, key, script)
+        end
+    end
+    setmetatable(onto,onto)
+    return onto
+end
+setmetatable(libactor.On,libactor.On)
 
 -- For Condition, name can be any available script, will run its Check function
 function libactor.Check(key)
@@ -87,47 +108,48 @@ function libactor:__call(actor)
     actor:sleep(1 / 0)
 end
 
-local devmode
-local function enableDevmode()
+-- DevMode
+-- It self modifies itself by wrapping itself in xpcalls
+-- Enable by reading out libactor.DevMode, preferably in a Condition
+-- Disable by reading out libactor.Refresh
+local function devErrorMsg(err)
+    Debug(tostring(err))
+    SCREENMAN:SystemMessage('Lua error, check log for details.')
+end
+
+local function devProtect(fn)
+    return function(...)
+        local ret
+        local success =
+            xpcall(
+            function()
+                ret = {fn(unpack(arg))}
+            end,
+            devErrorMsg
+        )
+        return success and unpack(ret) or nil
+    end
+end
+
+local function devApplyProtection(name)
+    devmode[name] = rawget(libactor, name)
+    rawset(libactor, name, devProtect(devmode[name]))
+end
+
+local function devEnable()
     devmode = {}
 
-    local function errorMsg(err)
-        Debug(tostring(err))
-        SCREENMAN:SystemMessage('Lua error, check log for details.')
-    end
-
-    local function protect(fn)
-        return function(...)
-            local ret
-            local succ =
-                xpcall(
-                function()
-                    ret = {fn(unpack(arg))}
-                end,
-                errorMsg
-            )
-            return succ and unpack(ret) or nil
-        end
-    end
-
-    local function applyProtection(name)
-        devmode[name] = rawget(libactor, name)
-        rawset(libactor, name, protect(devmode[name]))
-    end
-
-    applyProtection('Init')
-    applyProtection('Update')
-    applyProtection('ApplyCallback')
-    applyProtection('Check')
-    applyProtection('__call')
-    applyProtection('__index')
-    applyProtection('require')
+    devApplyProtection('Init')
+    devApplyProtection('Update')
+    devApplyProtection('ApplyCallback')
+    devApplyProtection('Check')
+    devApplyProtection('require')
 
     Trace '[LibActor] DevMode enabled'
     return true
 end
 
--- Creates a special case for On-commands
+-- Indexing operations, will  check sharedData if there is no match
 function libactor:__index(key)
     -- Just return like normal if a key exist
     if rawget(self, key) ~= nil then
@@ -135,13 +157,10 @@ function libactor:__index(key)
     end
     -- All access to OnSomething is assumed to come from XML
     if messageCache[key] or string.find(key, '^On%u') then
+        local ApplyCallback = libactor.ApplyCallback
         return function(actor)
-            return libactor.ApplyCallback(actor, key)
+            return ApplyCallback(actor, key)
         end
-    end
-    -- Will always return the latest sharedData
-    if key == 'Data' then
-        return sharedData
     end
     -- Housekeeping
     if key == 'Refresh' then
@@ -149,6 +168,7 @@ function libactor:__index(key)
         actorCache = {}
         messageCache = {}
         sharedData = {}
+        libactor.Data = sharedData
         if devmode then
             for k, v in pairs(devmode) do
                 rawset(libactor, k, v)
@@ -159,12 +179,12 @@ function libactor:__index(key)
         Trace '[LibActor] Cache and shared data cleanup complete'
         return true
     end
-
+    -- Enables DevMode, will always return true
     if key == 'DevMode' then
         if devmode then
             return true
         end
-        return enableDevmode()
+        return devEnable()
     end
 
     -- Else just return something from sharedData, shortcuts are nice
@@ -173,10 +193,9 @@ end
 
 -- Shortcut to set shared data
 function libactor:__newindex(key, value)
-    if rawget(self, key) ~= nil then
-        return
+    if rawget(self, key) == nil then
+        sharedData[key] = value
     end
-    sharedData[key] = value
 end
 
 -- And we are done!
