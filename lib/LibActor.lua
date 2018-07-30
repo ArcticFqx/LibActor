@@ -3,7 +3,7 @@
  -- -- -- -- -- -- -- -- -- --
 
 _G.libactor = {
-    _VERSION = 'LibActor 0.4-dev2',
+    _VERSION = 'LibActor 0.4',
     GlobalData = libactor and libactor.GlobalData or {}
 }
 
@@ -39,8 +39,14 @@ local function includeLua(key)
         actorCache[key] = actorCache[name]
         return actorCache[name]
     end
-    actorCache[name] = libactor.Require(name)
-    actorCache[key] = actorCache[name]
+    local pack = libactor.Require(name)
+    if not pack then
+        local err = 'XML Error: Package "' .. name .. '" does not exist.'
+        SCREENMAN:SystemMessage(err) 
+        error('\n[LibActor] ' .. err )
+    end
+    actorCache[name] = pack
+    actorCache[key] = pack
     return actorCache[name]
 end
 
@@ -72,16 +78,28 @@ function libactor.Update(actor)
     return ret
 end
 
--- Used for Messages and custom Commands
+-- Used for Messages and custom Commands, usually only in XML
 function libactor.ApplyCallback(actor, key, script)
     local name = script or actor:GetName()
     local pack = actorCache[name] or includeLua(name)
     messageCache[key] = messageCache[key] or string.sub(key, 3)
-    return pack[messageCache[key]](actor)
+    local fn = pack[messageCache[key]]
+    if not fn then
+        local err = 'XML error: "' .. messageCache[key] .. 
+            '" on package "' .. name .. '" does not exist.'
+        SCREENMAN:SystemMessage(err) 
+        error('\n[LibActor] ' .. err)
+    end
+    return fn(actor)
 end
 
 -- For XML, redirection for actors to other files
 libactor.On = {}
+local function lbonError()
+    local err = 'XML error: Incomplete libactor.On. call.'
+    SCREENMAN:SystemMessage(err) 
+    Debug('\n[LibActor] ' .. err)
+end
 function libactor.On:__index(key)
     local onto = {}
     function onto:__index(script)
@@ -91,9 +109,11 @@ function libactor.On:__index(key)
             return ApplyCallback(actor, key, script)
         end
     end
+    onto.__call = lbonError
     setmetatable(onto,onto)
     return onto
 end
+libactor.On.__call = lbonError
 setmetatable(libactor.On,libactor.On)
 
 -- For Condition, name can be any available script, will run its Check function
@@ -113,8 +133,8 @@ end
 -- Enable by reading out libactor.DevMode, preferably in a Condition
 -- Disable by reading out libactor.Refresh
 local function devErrorMsg(err)
-    Debug(tostring(err))
     SCREENMAN:SystemMessage('Lua error, check log for details.')
+    Debug(tostring(err))
 end
 
 local function devProtect(fn)
