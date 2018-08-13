@@ -3,7 +3,7 @@
  -- -- -- -- -- -- -- -- -- --
 
 _G.libactor = {
-    _VERSION = 'LibActor 0.4',
+    _VERSION = 'LibActor 0.4.1',
     GlobalData = libactor and libactor.GlobalData or {}
 }
 
@@ -21,15 +21,33 @@ function libactor.Require(s, ...)
     if requireCache[name] then
         return unpack(requireCache[name])
     end
-    local file =
-        table.concat {
-        string.sub(GAMESTATE:GetCurrentSong():GetSongDir(), 2),
-        string.gsub(name, '%.', '/'), '.lua'
-    }
-    Trace('[LibActor] Loading ' .. file)
-    local ret = {assert(loadfile(file))(unpack(arg))}
-    requireCache[name] = ret
-    return unpack(requireCache[name])
+
+    local folder = '.' .. GAMESTATE:GetCurrentSong():GetSongDir()
+    local file = string.gsub(name, '%.', '/') .. '.lua'
+    local path = folder .. file
+    local func, err = loadfile(path)
+
+    if func then
+        Trace('[LibActor] Loading ' .. path)
+        requireCache[name] = {func(unpack(arg))}
+        return unpack(requireCache[name])
+    end
+
+    local additional = PREFSMAN:GetPreference('AdditionalSongFolders')
+    local _, si = string.find(folder, 'Songs/')
+    local base = string.sub(folder, si)
+
+    for w in string.gfind(additional,'[^,]+') do
+        path = w .. base .. file
+        local func = loadfile(path)
+        if func then
+            Trace('[LibActor] Loading ' .. path)
+            requireCache[name] = {func(unpack(arg))}
+            return unpack(requireCache[name])
+        end
+    end
+    
+    error(err)
 end
 
 -- Used internally for caching purposes
