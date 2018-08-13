@@ -39,7 +39,7 @@ function libactor.Require(s, ...)
 
     for w in string.gfind(additional,'[^,]+') do
         path = w .. base .. file
-        local func = loadfile(path)
+        func = loadfile(path)
         if func then
             Trace('[LibActor] Loading ' .. path)
             requireCache[name] = {func(unpack(arg))}

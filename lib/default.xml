@@ -2,19 +2,43 @@
     Use this to bootstrap your global scripts
     Include this as the first #BGCHANGES at beat 0 in your simfile, have fun!
 -->
-<ActorFrame Condition="(function() 
-local where=''
-local function from(s) where=s..'.' end
-local function load(s,...)
-    local f=string.sub(GAMESTATE:GetCurrentSong():GetSongDir(), 2)..string.gsub(string.lower(where..s),'%.','/')..'.lua'
-    Trace('[Loading] '..f)
-    return assert(loadfile(f))(unpack(arg))
-end
+<ActorFrame Condition="(function() local from, where local function ex()
 
 -- -- -- --  Add your scripts here  -- -- -- -- -- 
 
-from 'lib'
-load 'libactor'
+    from 'lib'
+    load 'libactor'
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+
+end
+local where=''
+function from(s) where=s..'.' end
+function load(s,...)
+    local folder = '.' .. GAMESTATE:GetCurrentSong():GetSongDir()
+    local file = string.gsub(where, '%.', '/') .. s .. '.lua'
+    local path = folder .. file
+    local func, err = loadfile(path)
+
+    if func then
+        Trace('[Loading] ' .. path)
+        return func()
+    end
+
+    local additional = PREFSMAN:GetPreference('AdditionalSongFolders')
+    local _, si = string.find(folder, 'Songs/')
+    local base = string.sub(folder, si)
+
+    for w in string.gfind(additional,'[^,]+') do
+        path = w .. base .. file
+        func = loadfile(path)
+        if func then
+            Trace('[Loading] ' .. path)
+            return func()
+        end
+    end
+
+    error(err)
+end
+ex()
 return false end)()"></ActorFrame>
