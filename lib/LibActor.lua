@@ -50,7 +50,7 @@ function libactor.Require(s, ...)
     -- Then try folders
     local addSongs = string.lower(PREFSMAN:GetPreference('AdditionalSongFolders'))
     local addFolder = string.lower(PREFSMAN:GetPreference('AdditionalFolders'))
-    local add = '.,' .. string.gsub(addSongs, "/songs", "") .. ',' .. string.lower(addFolder)
+    local add = '.,' .. string.gsub(addSongs, '/songs', '') .. ',' .. string.lower(addFolder)
      
     for w in string.gfind(add,'[^,]+') do
         path = w .. folder .. file
@@ -66,7 +66,7 @@ function libactor.Require(s, ...)
 
     -- Pick suitable error
     for i=1, table.getn(log) do
-        if not string.find(log[i], "^cannot read") then
+        if not string.find(log[i], '^cannot read') then
             error(log[i], devmode and 2 or 1)
         end
     end
