@@ -2,12 +2,16 @@
 -- LibActor global reference --
  -- -- -- -- -- -- -- -- -- --
 
-_G.libactor = {
-    _VERSION = 'LibActor 0.4.1',
+ _G.libactor = {
+    _VERSION = 'LibActor 0.4.2-dev',
     GlobalData = libactor and libactor.GlobalData or {}
 }
 
+-- Shorthand
+_G.lax = _G.libactor
+
 local requireCache = {}
+local pathCache = {}
 local actorCache = {}
 local messageCache = {}
 local sharedData = {}
@@ -15,39 +19,58 @@ local devmode = false
 
 libactor.Data = sharedData
 
--- require with a search path only in your song directory
+local devErrorMsg
+
+-- Require with a search path in your song directory, caches path hits and results
 function libactor.Require(s, ...)
     local name = string.lower(s)
+
+    -- First check if we have a cached pack
     if requireCache[name] then
         return unpack(requireCache[name])
     end
 
-    local folder = '.' .. GAMESTATE:GetCurrentSong():GetSongDir()
+    local folder = GAMESTATE:GetCurrentSong():GetSongDir()
     local file = string.gsub(name, '%.', '/') .. '.lua'
-    local path = folder .. file
-    local func, err = loadfile(path)
+    local path, func, err
+    local log = {}
 
-    if func then
-        Trace('[LibActor] Loading ' .. path)
-        requireCache[name] = {func(unpack(arg))}
-        return unpack(requireCache[name])
-    end
-
-    local additional = PREFSMAN:GetPreference('AdditionalSongFolders')
-    local _, si = string.find(folder, 'Songs/')
-    local base = string.sub(folder, si)
-
-    for w in string.gfind(additional,'[^,]+') do
-        path = w .. base .. file
-        func = loadfile(path)
+    -- Check if we have a working path cached
+    if pathCache[folder] then
+        path = pathCache[folder] .. file
+        func, err = loadfile(path)
         if func then
             Trace('[LibActor] Loading ' .. path)
             requireCache[name] = {func(unpack(arg))}
             return unpack(requireCache[name])
         end
+        log[table.getn(log)+1] = err
     end
-    
-    error(err)
+
+    -- Then try folders
+    local addSongs = string.lower(PREFSMAN:GetPreference('AdditionalSongFolders'))
+    local addFolder = string.lower(PREFSMAN:GetPreference('AdditionalFolders'))
+    local add = '.,' .. string.gsub(addSongs, "/songs", "") .. ',' .. string.lower(addFolder)
+     
+    for w in string.gfind(add,'[^,]+') do
+        path = w .. folder .. file
+        func, err = loadfile(path)
+        if func then
+            Trace('[LibActor] Loading ' .. path)
+            requireCache[name] = {func(unpack(arg))}
+            pathCache[folder] = w .. folder
+            return unpack(requireCache[name])
+        end
+        log[table.getn(log)+1] = err
+    end
+
+    -- Pick suitable error
+    for i=1, table.getn(log) do
+        if not string.find(log[i], "^cannot read") then
+            error(log[i], devmode and 2 or 1)
+        end
+    end
+    error(log[1])
 end
 
 -- Used internally for caching purposes
@@ -59,9 +82,8 @@ local function includeLua(key)
     end
     local pack = libactor.Require(name)
     if not pack then
-        local err = 'XML Error: Package "' .. name .. '" does not exist.'
-        SCREENMAN:SystemMessage(err) 
-        error('\n[LibActor] ' .. err )
+        local err = '[LibActor] XML Error: Could not load package "' .. name .. '".'
+        error(err, -1)
     end
     actorCache[name] = pack
     actorCache[key] = pack
@@ -103,10 +125,9 @@ function libactor.ApplyCallback(actor, key, script)
     messageCache[key] = messageCache[key] or string.sub(key, 3)
     local fn = pack[messageCache[key]]
     if not fn then
-        local err = 'XML error: "' .. messageCache[key] .. 
+        local err = '[LibActor] XML error: "' .. messageCache[key] .. 
             '" on package "' .. name .. '" does not exist.'
-        SCREENMAN:SystemMessage(err) 
-        error('\n[LibActor] ' .. err)
+        error(err, -1)
     end
     return fn(actor)
 end
@@ -114,9 +135,7 @@ end
 -- For XML, redirection for actors to other files
 libactor.On = {}
 local function lbonError()
-    local err = 'XML error: Incomplete libactor.On. call.'
-    SCREENMAN:SystemMessage(err) 
-    Debug('\n[LibActor] ' .. err)
+    devErrorMsg('[LibActor] XML error: Incomplete libactor.On. call.')
 end
 function libactor.On:__index(key)
     local onto = {}
@@ -150,9 +169,11 @@ end
 -- It self modifies itself by wrapping itself in xpcalls
 -- Enable by reading out libactor.DevMode, preferably in a Condition
 -- Disable by reading out libactor.Refresh
-local function devErrorMsg(err)
-    SCREENMAN:SystemMessage('Lua error, check log for details.')
+function devErrorMsg(err)
+    print() -- Spacer to make error easy to find
+    SCREENMAN:SystemMessage('[LibActor] Lua error: Check log for details.')
     Debug(tostring(err))
+    print() -- Spacer
 end
 
 local function devProtect(fn)
@@ -189,10 +210,6 @@ end
 
 -- Indexing operations, will  check sharedData if there is no match
 function libactor:__index(key)
-    -- Just return like normal if a key exist
-    if rawget(self, key) ~= nil then
-        return v
-    end
     -- All access to OnSomething is assumed to come from XML
     if messageCache[key] or string.find(key, '^On%u') then
         local ApplyCallback = libactor.ApplyCallback
@@ -203,6 +220,7 @@ function libactor:__index(key)
     -- Housekeeping
     if key == 'Refresh' then
         requireCache = {}
+        pathCache = {}
         actorCache = {}
         messageCache = {}
         sharedData = {}
