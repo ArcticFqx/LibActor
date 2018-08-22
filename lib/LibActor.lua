@@ -35,30 +35,20 @@ function libactor.Require(s, ...)
     local path, func, err
     local log = {}
 
-    -- Check if we have a working path cached
-    if pathCache[folder] then
-        path = pathCache[folder] .. file
-        func, err = loadfile(path)
-        if func then
-            Trace('[LibActor] Loading ' .. path)
-            requireCache[name] = {func(unpack(arg))}
-            return unpack(requireCache[name])
-        end
-        log[table.getn(log)+1] = err
-    end
-
-    -- Then try folders
+    -- Then build search path
     local addSongs = string.lower(PREFSMAN:GetPreference('AdditionalSongFolders'))
     local addFolder = string.lower(PREFSMAN:GetPreference('AdditionalFolders'))
-    local add = '.,' .. string.gsub(addSongs, '/songs', '') .. ',' .. string.lower(addFolder)
-     
+    local add = (pathCache[folder] or '' ) .. '.,' .. 
+                    string.gsub(addSongs, '/songs', '') .. ',' .. addFolder
+    
+    -- Try each path
     for w in string.gfind(add,'[^,]+') do
         path = w .. folder .. file
         func, err = loadfile(path)
         if func then
             Trace('[LibActor] Loading ' .. path)
             requireCache[name] = {func(unpack(arg))}
-            pathCache[folder] = w .. folder
+            pathCache[folder] = w .. folder .. ','
             return unpack(requireCache[name])
         end
         log[table.getn(log)+1] = err

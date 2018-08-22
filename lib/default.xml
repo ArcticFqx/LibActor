@@ -2,7 +2,7 @@
     Use this to bootstrap your global scripts
     Include this as the first #BGCHANGES at beat 0 in your simfile, have fun!
 -->
-<ActorFrame Condition="(function() local from, where local function ex()
+<ActorFrame Condition="(function() local from, load local function ex()
 
 -- -- -- --  Add your scripts here  -- -- -- -- -- 
 
@@ -12,33 +12,27 @@
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 
 end
-local where=''
+local where,pc,log='','',{}
 function from(s) where=s..'.' end
 function load(s,...)
-    local folder = '.' .. GAMESTATE:GetCurrentSong():GetSongDir()
+    local folder = GAMESTATE:GetCurrentSong():GetSongDir()
     local file = string.gsub(where, '%.', '/') .. s .. '.lua'
-    local path = folder .. file
-    local func, err = loadfile(path)
-
-    if func then
-        Trace('[Loading] ' .. path)
-        return func()
-    end
-
-    local additional = PREFSMAN:GetPreference('AdditionalSongFolders')
-    local _, si = string.find(folder, 'Songs/')
-    local base = string.sub(folder, si)
-
-    for w in string.gfind(additional,'[^,]+') do
-        path = w .. base .. file
-        func = loadfile(path)
+    local addSongs = string.lower(PREFSMAN:GetPreference('AdditionalSongFolders'))
+    local addFolder = string.lower(PREFSMAN:GetPreference('AdditionalFolders'))
+    local add = pc .. '.,' .. string.gsub(addSongs, '/songs', '') .. ',' .. string.lower(addFolder)
+    for w in string.gfind(add,'[^,]+') do
+        local path = w .. folder .. file
+        local func, err = loadfile(path)
         if func then
             Trace('[Loading] ' .. path)
-            return func()
+            pc = w .. ','
+            return func(unpack(arg))
         end
+        log[table.getn(log)+1] = '\n[Loader error] ' .. string.gsub(err,'\n.+','') .. '\n'
     end
-
-    error(err)
+    for i=1, table.getn(log) do
+        if not string.find(log[i], '^cannot read') then Debug(log[i]) return end
+    end
+    Debug(log[1])
 end
-ex()
-return false end)()"></ActorFrame>
+return ex() and false end)()"></ActorFrame>
