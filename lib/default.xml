@@ -3,36 +3,35 @@
     Include this as the first #BGCHANGES at beat 0 in your simfile, have fun!
 -->
 <ActorFrame Condition="(function() local from, load local function ex()
-
 -- -- -- --  Add your scripts here  -- -- -- -- -- 
 
     from 'lib'
     load 'libactor'
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-
 end
 local where,pc,log='','',{}
 function from(s) where=s..'.' end
 function load(s,...)
-    local folder = GAMESTATE:GetCurrentSong():GetSongDir()
+    local folder = string.gsub(string.lower(GAMESTATE:GetCurrentSong():GetSongDir()), '/songs', '')
     local file = string.gsub(where, '%.', '/') .. s .. '.lua'
     local addSongs = string.lower(PREFSMAN:GetPreference('AdditionalSongFolders'))
     local addFolder = string.lower(PREFSMAN:GetPreference('AdditionalFolders'))
-    local add = pc .. '.,' .. string.gsub(addSongs, '/songs', '') .. ',' .. string.lower(addFolder)
+    local add = pc .. './songs,' .. addSongs .. ',' 
+                .. string.gsub(addFolder, ',' ,'/songs,') .. '/songs'
     for w in string.gfind(add,'[^,]+') do
         local path = w .. folder .. file
         local func, err = loadfile(path)
         if func then
-            Trace('[Loading] ' .. path)
+            Debug('[Loading] ' .. path)
             pc = w .. ','
             return func(unpack(arg))
         end
         log[table.getn(log)+1] = '\n[Loader error] ' .. string.gsub(err,'\n.+','') .. '\n'
     end
     for i=1, table.getn(log) do
-        if not string.find(log[i], '^cannot read') then Debug(log[i]) return end
+        if not string.find(log[i], 'cannot read') then Debug(log[i]) return end
     end
     Debug(log[1])
 end
-return ex() and false end)()"></ActorFrame>
+return ex() and true end)()"></ActorFrame>

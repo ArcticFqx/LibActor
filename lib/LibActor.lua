@@ -2,19 +2,37 @@
 -- LibActor global reference --
  -- -- -- -- -- -- -- -- -- --
 
- _G.libactor = {
-    _VERSION = 'LibActor 0.4.2',
+local libactor = {
+    _VERSION = 'LibActor 0.4.3',
     GlobalData = libactor and libactor.GlobalData or {}
 }
 
--- Shorthand
-_G.lax = _G.libactor
+_G.libactor = libactor
+_G.lax = libactor
 
+-- Localize Lua functions that gets called fairly often
+-- No point in doing that for C userdata and error
+local lower = string.lower
+local gsub = string.gsub
+local unpack = unpack
+local gfind = string.gfind
+local loadfile = loadfile
+local Debug = Debug
+local Trace = Trace
+local print = print
+local getn = table.getn
+local find = string.find
+local sub = string.sub
+local setmetatable = setmetatable
+local pairs = pairs
+local rawset,rawget = rawset, rawget
+
+-- Initialize state/cache
 local requireCache = {}
-local pathCache = {}
 local actorCache = {}
 local messageCache = {}
 local sharedData = {}
+local lastPath = ''
 local devmode = false
 
 libactor.Data = sharedData
@@ -23,40 +41,40 @@ local devErrorMsg
 
 -- Require with a search path in your song directory, caches path hits and results
 function libactor.Require(s, ...)
-    local name = string.lower(s)
+    local name = lower(s)
 
     -- First check if we have a cached pack
     if requireCache[name] then
         return unpack(requireCache[name])
     end
 
-    local folder = GAMESTATE:GetCurrentSong():GetSongDir()
-    local file = string.gsub(name, '%.', '/') .. '.lua'
+    local folder = gsub(lower(GAMESTATE:GetCurrentSong():GetSongDir()), '/songs', '')
+    local file = gsub(name, '%.', '/') .. '.lua'
     local path, func, err
     local log = {}
 
     -- Then build search path
-    local addSongs = string.lower(PREFSMAN:GetPreference('AdditionalSongFolders'))
-    local addFolder = string.lower(PREFSMAN:GetPreference('AdditionalFolders'))
-    local add = (pathCache[folder] or '' ) .. '.,' .. 
-                    string.gsub(addSongs, '/songs', '') .. ',' .. addFolder
+    local addSongs = lower(PREFSMAN:GetPreference('AdditionalSongFolders'))
+    local addFolder = lower(PREFSMAN:GetPreference('AdditionalFolders'))
+    local add = lastPath .. './songs,' .. addSongs .. ',' 
+                .. gsub(addFolder, ',' ,'/songs,') .. '/songs'
     
     -- Try each path
-    for w in string.gfind(add,'[^,]+') do
+    for w in gfind(add,'[^,]+') do
         path = w .. folder .. file
         func, err = loadfile(path)
         if func then
-            Trace('[LibActor] Loading ' .. path)
+            Debug('[LibActor] Loading ' .. path)
+            lastPath = w .. ','
             requireCache[name] = {func(unpack(arg))}
-            pathCache[folder] = w .. folder .. ','
             return unpack(requireCache[name])
         end
-        log[table.getn(log)+1] = err
+        log[getn(log)+1] = err
     end
 
     -- Pick suitable error
-    for i=1, table.getn(log) do
-        if not string.find(log[i], '^cannot read') then
+    for i=1, getn(log) do
+        if not find(log[i], 'cannot read') then
             error(log[i], devmode and 2 or 1)
         end
     end
@@ -65,7 +83,7 @@ end
 
 -- Used internally for caching purposes
 local function includeLua(key)
-    local name = string.lower(key)
+    local name = lower(key)
     if actorCache[name] then
         actorCache[key] = actorCache[name]
         return actorCache[name]
@@ -112,7 +130,7 @@ end
 function libactor.ApplyCallback(actor, key, script)
     local name = script or actor:GetName()
     local pack = actorCache[name] or includeLua(name)
-    messageCache[key] = messageCache[key] or string.sub(key, 3)
+    messageCache[key] = messageCache[key] or sub(key, 3)
     local fn = pack[messageCache[key]]
     if not fn then
         local err = '[LibActor] XML error: "' .. messageCache[key] .. 
@@ -201,7 +219,7 @@ end
 -- Indexing operations, will  check sharedData if there is no match
 function libactor:__index(key)
     -- All access to OnSomething is assumed to come from XML
-    if messageCache[key] or string.find(key, '^On%u') then
+    if messageCache[key] or find(key, '^On%u') then
         local ApplyCallback = libactor.ApplyCallback
         return function(actor)
             return ApplyCallback(actor, key)
