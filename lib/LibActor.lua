@@ -56,9 +56,9 @@ function libactor.Require(s, ...)
     -- Then build search path
     local addSongs = lower(PREFSMAN:GetPreference('AdditionalSongFolders'))
     local addFolder = lower(PREFSMAN:GetPreference('AdditionalFolders'))
-    local add = lastPath .. './songs,' .. addSongs .. ',' 
+    local add = lastPath .. './songs,' .. addSongs .. ','
                 .. gsub(addFolder, ',' ,'/songs,') .. '/songs'
-    
+
     -- Try each path
     for w in gfind(add,'[^,]+') do
         path = w .. folder .. file
@@ -66,7 +66,10 @@ function libactor.Require(s, ...)
         if func then
             Debug('[LibActor] Loading ' .. path)
             lastPath = w .. ','
-            requireCache[name] = {func(unpack(arg))}
+            local oldarg = _G.arg
+            _G.arg = arg
+            requireCache[name] = {func()}
+            _G.arg = oldarg
             return unpack(requireCache[name])
         end
         log[getn(log)+1] = err
@@ -133,7 +136,7 @@ function libactor.ApplyCallback(actor, key, script)
     messageCache[key] = messageCache[key] or sub(key, 3)
     local fn = pack[messageCache[key]]
     if not fn then
-        local err = '[LibActor] XML error: "' .. messageCache[key] .. 
+        local err = '[LibActor] XML error: "' .. messageCache[key] ..
             '" on package "' .. name .. '" does not exist.'
         error(err, -1)
     end
@@ -228,7 +231,7 @@ function libactor:__index(key)
     -- Housekeeping
     if key == 'Refresh' then
         requireCache = {}
-        pathCache = {}
+        lastPath = ''
         actorCache = {}
         messageCache = {}
         sharedData = {}
