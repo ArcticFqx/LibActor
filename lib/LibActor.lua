@@ -3,7 +3,7 @@
  -- -- -- -- -- -- -- -- -- --
 
 local libactor = {
-    _VERSION = 'LibActor 0.4.3',
+    _VERSION = 'LibActor 0.4.4',
     GlobalData = libactor and libactor.GlobalData or {}
 }
 
@@ -130,7 +130,7 @@ function libactor.Update(actor)
 end
 
 -- Used for Messages and custom Commands, usually only in XML
-function libactor.ApplyCallback(actor, key, script)
+function libactor.ApplyCallback(actor, key, script, ...)
     local name = script or actor:GetName()
     local pack = actorCache[name] or includeLua(name)
     messageCache[key] = messageCache[key] or sub(key, 3)
@@ -140,7 +140,7 @@ function libactor.ApplyCallback(actor, key, script)
             '" on package "' .. name .. '" does not exist.'
         error(err, -1)
     end
-    return fn(actor)
+    return fn(actor, unpack(arg))
 end
 
 -- For XML, redirection for actors to other files
@@ -153,8 +153,8 @@ function libactor.On:__index(key)
     function onto:__index(script)
         messageCache[key] = key
         local ApplyCallback = libactor.ApplyCallback
-        return function(actor)
-            return ApplyCallback(actor, key, script)
+        return function(actor, ...)
+            return ApplyCallback(actor, key, script, unpack(arg))
         end
     end
     onto.__call = lbonError
